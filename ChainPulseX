@@ -1,0 +1,85 @@
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+class ChainPulseX:
+    def __init__(self):
+        self.coingecko_api_url = 'https://api.coingecko.com/api/v3'
+        self.blockchair_api_url = 'https://api.blockchair.com'
+
+    def get_blockchain_data(self, blockchain: str) -> dict:
+        """Fetches general information for a specific blockchain."""
+        url = f"{self.coingecko_api_url}/coins/{blockchain}"
+        response = requests.get(url)
+        return response.json()
+
+    def get_blockchain_statistics(self, blockchain: str) -> dict:
+        """Fetches blockchain statistics such as transaction count, block time, etc."""
+        url = f"{self.blockchair_api_url}/{blockchain}/stats"
+        response = requests.get(url)
+        return response.json().get('data', {})
+
+    def analyze_blockchain_metrics(self, blockchain: str) -> dict:
+        """Analyzes key metrics such as transaction count, average block time, and network hash rate."""
+        data = self.get_blockchain_statistics(blockchain)
+        if not data:
+            return {
+                'blockchain': blockchain,
+                'transaction_count': 0,
+                'average_block_time': 0,
+                'network_hash_rate': 0
+            }
+        return {
+            'blockchain': blockchain,
+            'transaction_count': data.get('transactions', 0),
+            'average_block_time': data.get('block_time', 0),
+            'network_hash_rate': data.get('hashrate', 0)
+        }
+
+    def get_blockchain_transaction_data(self, blockchain: str, days: int) -> pd.DataFrame:
+        """Fetches historical transaction data for a specific blockchain."""
+        url = f"{self.blockchair_api_url}/{blockchain}/stats"
+        params = {
+            'from': (datetime.now() - pd.DateOffset(days=days)).strftime('%Y-%m-%d'),
+            'to': datetime.now().strftime('%Y-%m-%d')
+        }
+        response = requests.get(url, params=params)
+        data = response.json().get('data', [])
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+        df.set_index('date', inplace=True)
+        return df[['transactions']]
+
+    def plot_blockchain_transaction_trends(self, blockchain: str, days: int):
+        """Plots historical transaction trends for a specific blockchain."""
+        df = self.get_blockchain_transaction_data(blockchain, days)
+        if df.empty:
+            print("No transaction data found.")
+            return
+
+        plt.figure(figsize=(12, 6))
+        df['transactions'].plot()
+        plt.title(f'{blockchain.capitalize()} Transaction Trend')
+        plt.xlabel('Date')
+        plt.ylabel('Number of Transactions')
+        plt.grid(True)
+        plt.show()
+
+# Example Usage
+if __name__ == "__main__":
+    chain_pulse_x = ChainPulseX()
+
+    # Fetch and Display Blockchain Data
+    blockchain = 'bitcoin'  # Replace with the blockchain name you want to analyze
+    blockchain_data = chain_pulse_x.get_blockchain_data(blockchain)
+    print(f"General Data for {blockchain.capitalize()}:")
+    print(blockchain_data)
+
+    # Analyze and Display Blockchain Metrics
+    metrics = chain_pulse_x.analyze_blockchain_metrics(blockchain)
+    print(f"Metrics for blockchain {blockchain.capitalize()}:")
+    print(metrics)
+
+    # Plot Historical Transaction Trends
+    chain_pulse_x.plot_blockchain_transaction_trends(blockchain=blockchain, days=30)  # Last 30 days
